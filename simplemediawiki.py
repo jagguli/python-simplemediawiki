@@ -43,6 +43,8 @@ try:
     import simplejson as json
 except ImportError:
     import json
+import requests
+from requests_ntlm import HttpNtlmAuth
 
 if sys.version_info[0] == 3:
     import http.cookiejar as cookielib
@@ -103,20 +105,9 @@ class MediaWiki(object):
         self._api_url = api_url
         self._http_user = http_user
         self._http_password = http_password
-        if cookiejar:
-            self._cj = cookiejar
-        elif cookie_file:
-            self._cj = cookielib.LWPCookieJar(cookie_file)
-            try:
-                self._cj.load()
-            except IOError:
-                self._cj.save()
-                self._cj.load()
-        else:
-            self._cj = cookielib.CookieJar()
-        self._opener = urllib2.build_opener(
-            urllib2.HTTPCookieProcessor(self._cj))
-        self._opener.addheaders = [('User-Agent', user_agent)]
+        self.session = requests.Session()
+        self.session.auth = HttpNtlmAuth(
+            'DOMAIN\\user','pass', self.session)
 
     def _fetch_http(self, url, params, force_get=False):
         """
@@ -133,39 +124,40 @@ class MediaWiki(object):
         :param force_get: force a GET request instead of POST
         """
         params['format'] = 'json'
-        if sys.version_info[0] == 3:
-            fixed = urllib.urlencode(tuple(params.items()))
-        # urllib.urlencode (in Python 2) expects str objects, not unicode
-        elif sys.version_info[0] == 2:
-            fixed = urllib.urlencode(
-                tuple((to_bytes(k), to_bytes(v)) for k, v in
-                      params.items())).encode('utf-8')
-        if force_get:
-            request = urllib2.Request(url + '?' + fixed)
-        else:
-            if sys.version_info[0] == 3:
-                fixed = bytearray(fixed, 'utf-8')
-            request = urllib2.Request(url, fixed)
-        if self._http_user is not None:
-            auth_str = '%s:%s' % (self._http_user, self._http_password)
-            if sys.version_info[0] == 3:
-                auth_str = bytearray(auth_str, 'utf-8')
-            base64string = base64.encodestring(auth_str).replace('\n', '')
-            request.add_header("Authorization", "Basic %s" % base64string)
-        request.add_header('Accept-encoding', 'gzip')
-        response = self._opener.open(request)
-        if isinstance(self._cj, cookielib.FileCookieJar):
-            self._cj.save()
-        if response.headers.get('Content-Encoding') == 'gzip':
-            compressed = StringIO(response.read())
-            gzipper = gzip.GzipFile(fileobj=compressed)
-            data = gzipper.read()
-        else:
-            data = response.read()
-        if sys.version_info[0] == 3:
-            encoding = response.info().get_content_charset() or "utf-8"
-            data = data.decode(encoding)
-        return data
+        data = self.session.post(url, data=params)
+        #if sys.version_info[0] == 3:
+        #    fixed = urllib.urlencode(tuple(params.items()))
+        ## urllib.urlencode (in Python 2) expects str objects, not unicode
+        #elif sys.version_info[0] == 2:
+        #    fixed = urllib.urlencode(
+        #        tuple((to_bytes(k), to_bytes(v)) for k, v in
+        #              params.items())).encode('utf-8')
+        #if force_get:
+        #    request = urllib2.Request(url + '?' + fixed)
+        #else:
+        #    if sys.version_info[0] == 3:
+        #        fixed = bytearray(fixed, 'utf-8')
+        #    request = urllib2.Request(url, fixed)
+        #if self._http_user is not None:
+        #    auth_str = '%s:%s' % (self._http_user, self._http_password)
+        #    if sys.version_info[0] == 3:
+        #        auth_str = bytearray(auth_str, 'utf-8')
+        #    base64string = base64.encodestring(auth_str).replace('\n', '')
+        #    request.add_header("Authorization", "Basic %s" % base64string)
+        #request.add_header('Accept-encoding', 'gzip')
+        #response = self._opener.open(request)
+        #if isinstance(self._cj, cookielib.FileCookieJar):
+        #    self._cj.save()
+        #if response.headers.get('Content-Encoding') == 'gzip':
+        #    compressed = StringIO(response.read())
+        #    gzipper = gzip.GzipFile(fileobj=compressed)
+        #    data = gzipper.read()
+        #else:
+        #    data = response.read()
+        #if sys.version_info[0] == 3:
+        #    encoding = response.info().get_content_charset() or "utf-8"
+        #    data = data.decode(encoding)
+        return data.text
 
     def call(self, params):
         """
