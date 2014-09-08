@@ -7,7 +7,7 @@ except ImportError:
 version='1.1.2'
 cmdclass = {}
 command_options = {}
-install_requires = []
+install_requires = ['requests-ntlm']
 
 # If sphinx is installed, enable the command
 try:

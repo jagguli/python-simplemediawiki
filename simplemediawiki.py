@@ -101,13 +101,15 @@ class MediaWiki(object):
     _psuedo_namespaces = None
 
     def __init__(self, api_url, cookie_file=None, cookiejar=None,
-                 user_agent=DEFAULT_UA, http_user=None, http_password=None):
+                 user_agent=DEFAULT_UA, http_user=None, http_password=None,
+                 ntlm_user=None, ntlm_password=None):
         self._api_url = api_url
         self._http_user = http_user
         self._http_password = http_password
         self.session = requests.Session()
         self.session.auth = HttpNtlmAuth(
-            'DOMAIN\\user','pass', self.session)
+                ntlm_user or self._http_user,
+                ntlm_password or self._http_password, self.session)
 
     def _fetch_http(self, url, params, force_get=False):
         """
